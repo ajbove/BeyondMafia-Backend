@@ -1,7 +1,9 @@
-const mysql = require('mysql');
+const mysql = require('mysql2');
 
+async function getDatabase(){
 var con = mysql.createConnection({
-    host: "localhost",
+    host: "127.0.0.1",
+	port: "3306",
     user: "anthony",
     password: "Sababa2094!"
   });
@@ -9,7 +11,6 @@ var con = mysql.createConnection({
 con.connect(function(err) {
     if (err) throw err;
     console.log("Connected");
-
     var createSql = 'CREATE SCHEMA mafiaData';
     var userTable = 'CREATE TABLE `mafiaData`.`userTable` (\
       `playerid` INT NOT NULL AUTO_INCREMENT,\
@@ -29,17 +30,16 @@ con.connect(function(err) {
       UNIQUE INDEX `salt_UNIQUE` (`salt` ASC) VISIBLE);';
 
 
-    con.query(createSql, function (err, result) {
+    con.query(createSql, (err, result) =>{
       if (err) throw err;
       console.log("Database created");
-    });
-    
-    con.query(userTable, function (err, result) {
-        if (err) throw err;
-        console.log("User Table created");
+		con.query(userTable, (err, result)=> {
+			if (err) throw err;
+			console.log("User Table created");
+			resolve(con);
       });
-    
-    
+    });    
 })
+}
 
-module.exports = con;
+exports.getDatabase = getDatabase;
