@@ -5,7 +5,12 @@ router.get('/', (req,res) => {
 
 });
 
-router.get('/new', (req, res) => {
+router.post('/register', (req, res) => {
+    
+
+});
+
+router.get('/login', (req, res) => {
 
 });
 
