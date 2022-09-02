@@ -3,24 +3,19 @@ const mysql = require('mysql2/promise');
 
 async function initalizationQuery(con){
 var createSchema = `CREATE SCHEMA IF NOT EXISTS mafiaData`
-await con.execute(createSchema)
-var createUserTable = 'CREATE TABLE IF NOT EXISTS `mafiaData`.`userTable` (\
-  `playerid` INT NOT NULL AUTO_INCREMENT,\
-  `username` VARCHAR(45) NOT NULL,\
-  `hash` VARCHAR(45) NOT NULL,\
-  `email` VARCHAR(45) NOT NULL,\
-  `stats` JSON NULL,\
-  `friends` JSON NULL,\
-  `blocked` JSON NULL,\
-  `bio` MEDIUMTEXT,\
-  `salt` BINARY(64) NOT NULL,\
-  PRIMARY KEY (`playerid`),\
-  UNIQUE INDEX `playerid_UNIQUE` (`playerid` ASC) VISIBLE,\
-  UNIQUE INDEX `username_UNIQUE` (`username` ASC) VISIBLE,\
-  UNIQUE INDEX `hash_UNIQUE` (`hash` ASC) VISIBLE,\
-  UNIQUE INDEX `email_UNIQUE` (`email` ASC) VISIBLE,\
-  UNIQUE INDEX `salt_UNIQUE` (`salt` ASC) VISIBLE);';
-con.execute(createUserTable);
+await con.execute(createSchema);
+var createUserTable = `CREATE TABLE IF NOT EXISTS mafiaData.userTable(
+  playerid INT AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(28) NOT NULL,
+  passwordhash VARCHAR(256) NOT NULL,
+  email VARCHAR(50) NOT NULL,
+  bio VARCHAR(300),
+  cookie VARCHAR(256),
+  UNIQUE(playerid),
+  UNIQUE(email),
+  UNIQUE(username))
+  `
+await con.execute(createUserTable);
 var createGamesTable =  `CREATE TABLE IF NOT EXISTS mafiaData.Games
 (gameId int AUTO_INCREMENT PRIMARY KEY,
 port int,
@@ -53,7 +48,6 @@ UNIQUE(uuid)
 )`
 con.execute(playerSocket)
 }
-
 async function getDatabase(){
 var con = await mysql.createConnection({
     host: "127.0.0.1",
