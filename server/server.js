@@ -83,10 +83,15 @@ var date = new Date();
 
 async function getUser(id,db,callback){
   try{
-  var res = await db.query("SELECT username, bio FROM mafiadata.usertable WHERE playerid = ? LIMIT 1",[id]);
+  var res = await db.query("SELECT username, bio,wins,losses,desertions,points,gems FROM mafiadata.usertable WHERE playerid = ? LIMIT 1",[id]);
   var writeUsername = res[0][0]['username'];
   var bio = res[0][0]['bio'];
-  callback({cmd:1,username:writeUsername,bio:bio});
+  var wins = res[0][0]['wins'];
+  var losses = res[0][0]['losses'];
+  var desertions = res[0][0]['desertions'];
+  var points = res[0][0]['points'];
+  var gems = res[0][0]['gems'];
+  callback({cmd:1,username:writeUsername,bio:bio,wins:wins,losses:losses,desertions:desertions,points:points,gems:gems});
 }
 catch(e){
   callback({cmd:-1})
@@ -114,7 +119,7 @@ async function getGames(db,page,bmcookie,callback){
         roles.push(item['roleConfig']);
       })
       await Promise.all(promises);
-      gameArray.push({gameId:games.gameId,maxPlayers:games.maxPlayers,currentPlayers:res[0][0]['COUNT(*)'],roles:roles});
+      gameArray.push({gameId:games.gameId,state:games.state,startedGame:games.startedGame,gameEnded:games.gameEnded,lockedGame:games.lockedGame,rankedGame:games.lockedGame,maxPlayers:games.maxPlayers,currentPlayers:res[0][0]['COUNT(*)'],roles:roles});
 })
 await Promise.all(gamePromise);
 await verifyUser(bmcookie,db,async(ret)=>{
@@ -128,6 +133,7 @@ await verifyUser(bmcookie,db,async(ret)=>{
 FROM mafiadata.games AS g, mafiadata.playersocket AS ps
 WHERE g.gameId = ps.gameId
 LIMIT 1`);
+
 var secondRes = await db.query("SELECT * FROM mafiadata.gameroles WHERE gameid = ?",[currentGame[0][0]['gameId']]);
 var roles = []
 promises = secondRes[0].map((item)=>{
@@ -152,6 +158,36 @@ await Promise.all(promises);
   }
 }
 
+async function checkSetup(db,roles,settings){
+  return new Promise(async(res,rej)=>{
+        var sortedRoles = roles.sort((a,b)=>{
+          if(a % 2 === 1 && b % 2 !== 1){
+            return 1;
+          }
+          else if(b % 2 === 1 && a % 2 !== 1){
+            return -1;
+          }
+          else if(a < b){
+            return -1;
+          }
+          else if(a > b){
+            return 1;
+          }
+          return 0;
+        });
+        var dbRes = await db.query("SELECT COUNT(*) FROM(SELECT * FROM mafiadata.setups where setup=JSON_ARRAY(?)) as subquery;",[sortedRoles]);
+        if(dbRes[0][0]['COUNT(*)'] === 0){
+            await db.query("INSERT INTO `mafiadata`.`setups` (`setup`) VALUES (JSON_ARRAY(?));",[sortedRoles])
+            dbRes = await db.query("SELECT LAST_INSERT_ID() AS id");
+            res(dbRes[0][0]['id']);
+        }
+        else{
+           dbRes = await db.query("SELECT * FROM mafiadata.setups where setup=JSON_ARRAY(?);",[sortedRoles]);
+           res(dbRes[0][0]['setupId']);
+        }
+  });
+}
+
 async function createGameQuery(body,db,callback){
   try{
     var dbRes = await db.query("SELECT COUNT(*) FROM(SELECT * FROM mafiadata.gametablequeue as ports) as subquery");
@@ -164,23 +200,22 @@ async function createGameQuery(body,db,callback){
   });
   await wait;
   dbRes = await db.query("SELECT * FROM mafiadata.gametablequeue as ports");
-  await db.query("LOCK TABLE mafiadata.gametablequeue WRITE")
   dbRes = await db.query("SELECT PORT FROM mafiadata.gametablequeue LIMIT 1;");
   var port = dbRes[0][0].PORT
   var s = net.Socket();
   s.connect(port, "127.0.0.1");
-  s.on('connect', ()=>{
+  s.on('connect',async ()=>{
     var buffer = Buffer.alloc(256).fill('\0');
+    var setupId = await checkSetup(db,body.roles,body.settings);
     var game = {
       cmd: 0,
-      roles:body.roles,
+      setupId: setupId,
       settings:body.settings
     }
     buffer.write(JSON.stringify(game))
     s.write(buffer,async (err,data)=>{
       s.destroy();
       await db.query("DELETE FROM mafiadata.gametablequeue WHERE port = ?",[port]);
-      await db.query("UNLOCK TABLES")
     })
 })
 }
@@ -242,6 +277,11 @@ app.post('/getUser', async(req,res)=>{
     resJson['0'] = 1;
     resJson['username'] = ret.username;
     resJson['bio'] = ret.bio;
+    resJson['wins'] = ret.wins;
+    resJson['losses'] = ret.losses;
+    resJson['desertions'] = ret.desertions;
+    resJson['points'] = ret.points;
+    resJson['gems'] = ret.gems;
     return res.status(200).json(resJson);
   }
   })
